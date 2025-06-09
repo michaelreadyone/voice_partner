@@ -74,10 +74,10 @@ def speech_digest_once(
                 audio_data = np.concatenate(buffer)
                 with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as f:
                     sf.write(f.name, audio_data, sample_rate)
-                    result = model.transcribe(f.name)
+                    result = model.transcribe(f.name, fp16=False, language="en")
                     text = result['text'].strip()
-                    if verbose:
-                        print("\n[Transcription]:", text)
+                    # if verbose:
+                    #     print("\n[Transcription]:", text)
                     return text
             else:
                 if verbose:
@@ -88,7 +88,9 @@ def speech_digest_once(
             print("\nInterrupted.")
         return None
 
-def text_to_speech(text, output_file=None, rate=150, volume=1.0, voice='Samantha'):
+def text_to_speech(text, output_file=None, rate=150, volume=1.0):
+    # voice = "Tingting"
+    voice = "Samantha"
     engine = pyttsx3.init()
     engine.setProperty('rate', rate)      # Speed of speech
     engine.setProperty('volume', volume)  # Volume (0.0 to 1.0)
@@ -117,6 +119,7 @@ def chat_loop():
     print("Chat (type 'exit' to quit):")
     while True:
         # user_input = input("You: ")
+        print()
         user_input = speech_digest_once()
         print(f"user_input: {user_input}")
         if user_input.lower() == "exit":
@@ -130,7 +133,7 @@ def chat_loop():
             messages.append({"role": "assistant", "content": response})
         else:
             print("No response from assistant.")
-        if "goodbye" in user_input.lower():
+        if "goodbye" in user_input.lower() or "good bye" in user_input.lower():
             break
     
 
