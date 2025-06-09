@@ -3,12 +3,33 @@ import numpy as np
 import whisper
 import soundfile as sf
 import tempfile
-import time
+import pyttsx3
+import os
+import openai
+from dotenv import load_dotenv
+
+load_dotenv()
+
+def openai_chat(messages, model="gpt-4o-mini"):
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        print("OPENAI_API_KEY not found in environment.")
+        return None
+    client = openai.OpenAI(api_key=api_key)
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        print("OpenAI API error:", e)
+        return None
 
 def speech_digest_once(
     model_size="base",
     energy_threshold=0.01,
-    pause_duration=3.0,
+    pause_duration=1.2,
     frame_duration=0.2,
     sample_rate=16000,
     verbose=True
@@ -67,21 +88,52 @@ def speech_digest_once(
             print("\nInterrupted.")
         return None
 
-# Example usage:
-# speech_digest()
+def text_to_speech(text, output_file=None, rate=150, volume=1.0, voice='Samantha'):
+    engine = pyttsx3.init()
+    engine.setProperty('rate', rate)      # Speed of speech
+    engine.setProperty('volume', volume)  # Volume (0.0 to 1.0)
+    if voice:
+        voices = engine.getProperty('voices')
+        for v in voices:
+            if voice.lower() in v.name.lower():
+                engine.setProperty('voice', v.id)
+                break
 
+    if output_file:
+        engine.save_to_file(text, output_file)
+        engine.runAndWait()
+        print(f"Saved speech to {output_file}")
+    else:
+        engine.say(text)
+        engine.runAndWait()
 
-def listener():
-    print("listening")
+def chat_loop():
+    messages = [
+        {"role": "system", "content": (
+            "You are a helpful assistant. Always reply in a casual, conversational tone. "
+            "Keep it short and friendly—never go over 100 words. Be direct and easy to understand."
+        )}
+    ]
+    print("Chat (type 'exit' to quit):")
+    while True:
+        # user_input = input("You: ")
+        user_input = speech_digest_once()
+        print(f"user_input: {user_input}")
+        if user_input.lower() == "exit":
+            break            
+        messages.append({"role": "user", "content": user_input})
+        # print(f'messages: {messages}')
+        response = openai_chat(messages)
+        if response:
+            print("Assistant:", response)
+            text_to_speech(response)
+            messages.append({"role": "assistant", "content": response})
+        else:
+            print("No response from assistant.")
+        if "goodbye" in user_input.lower():
+            break
     
+
     
-def pass2brain():
-    print("passing to brain")
-    
-def generate_answer():
-    print("generating answer")
-    
-def pass2speaker():
-    print("passing to speaker")
-    
-    
+if __name__ == "__main__":
+    chat_loop()
