@@ -2,5 +2,6 @@ openai
 sounddevice
 soundfile
 numpy
-whisper
-pyttsx3 
+pyttsx3
+openai-whisper
+python-dotenv
