@@ -1,3 +1,4 @@
+import datetime
 import sounddevice as sd
 import numpy as np
 import whisper
@@ -7,7 +8,12 @@ import pyttsx3
 import os
 import openai
 from dotenv import load_dotenv
+import torch
+from TTS.api import TTS as CoquiTTS
 
+from utils import save_conversation
+
+os.environ["KMP_DUPLICATE_LIB_OK"] = "True"
 load_dotenv()
 
 
@@ -94,27 +100,69 @@ def speech_digest_once(
         return None
 
 
-def text_to_speech(text, output_file=None, rate=150, volume=1.0):
-    # voice = "Tingting"
-    # voice = "Samantha"
-    voice = None
-    engine = pyttsx3.init()
-    engine.setProperty('rate', rate)      # Speed of speech
-    engine.setProperty('volume', volume)  # Volume (0.0 to 1.0)
-    if voice:
-        voices = engine.getProperty('voices')
-        for v in voices:
-            if voice.lower() in v.name.lower():
-                engine.setProperty('voice', v.id)
-                break
+# def text_to_speech(text, output_file=None, rate=150, volume=1.0):
+#     # voice = "Tingting"
+#     # voice = "Samantha"
+#     voice = None
+#     engine = pyttsx3.init()
+#     engine.setProperty('rate', rate)      # Speed of speech
+#     engine.setProperty('volume', volume)  # Volume (0.0 to 1.0)
+#     if voice:
+#         voices = engine.getProperty('voices')
+#         for v in voices:
+#             if voice.lower() in v.name.lower():
+#                 engine.setProperty('voice', v.id)
+#                 break
 
-    if output_file:
-        engine.save_to_file(text, output_file)
-        engine.runAndWait()
-        print(f"Saved speech to {output_file}")
+#     if output_file:
+#         engine.save_to_file(text, output_file)
+#         engine.runAndWait()
+#         print(f"Saved speech to {output_file}")
+#     else:
+#         engine.say(text)
+#         engine.runAndWait()
+        
+
+
+def text_to_speech(text, engine_name="pyttsx3", output_file=None, rate=150, volume=1.0):
+    """
+    Speak text using either pyttsx3 (local TTS engine) or Coqui TTS.
+    
+    Args:
+      text (str): Text to be spoken.
+      engine_name (str): "pyttsx3" or "coqui".
+      output_file (str or None): Optional filepath to save audio (Coqui only).
+      rate (int): Speaking rate for pyttsx3.
+      volume (float): Volume level (0.0 to 1.0) for pyttsx3.
+    """
+    if engine_name.lower() == "pyttsx3":
+        engine = pyttsx3.init()
+        engine.setProperty('rate', rate)
+        engine.setProperty('volume', volume)
+        if output_file:
+            engine.save_to_file(text, output_file)
+            engine.runAndWait()
+            print(f"Saved speech to {output_file}")
+        else:
+            engine.say(text)
+            engine.runAndWait()
+
+    elif engine_name.lower() == "coqui":
+        use_gpu = torch.cuda.is_available()
+        tts = CoquiTTS(model_name="tts_models/en/ljspeech/fast_pitch", gpu=use_gpu)
+        
+        if output_file:
+            tts.tts_to_file(text=text, file_path=output_file)
+            print(f"Saved speech to {output_file}")
+        else:
+            wav = tts.tts(text)
+            sr = tts.synthesizer.output_sample_rate
+            sd.play(wav, samplerate=sr)
+            sd.wait()
+
     else:
-        engine.say(text)
-        engine.runAndWait()
+        raise ValueError(f"Unsupported engine: {engine_name}")
+
 
 
 def chat_loop():
@@ -139,11 +187,22 @@ def chat_loop():
         if response:
             print("[Assistant]:")
             print(response)
-            text_to_speech(response)
+            text_to_speech(response, engine_name="pyttsx3")
             messages.append({"role": "assistant", "content": response})
         else:
             print("No response from assistant.")
         if "goodbye" in user_input.lower() or "good bye" in user_input.lower():
+            # save conversation to local txt with today's date
+            save_conversation(messages)
+            # date = datetime.datetime.now().strftime("%Y-%m-%d")
+            # with open(f"conversation_{date}.txt", "a") as f:
+            #     f.write("[Conversation Started at " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "]\n")
+            #     for message in messages:
+            #         f.write(f"{message['role']}: \n")
+            #         f.write(f"{message['content']}\n")
+            #     f.write("[Conversation Ended at " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "]\n")
+            #     f.write("\n")
+            
             break
 
 

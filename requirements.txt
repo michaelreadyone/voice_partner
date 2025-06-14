@@ -5,3 +5,4 @@ numpy
 pyttsx3
 openai-whisper
 python-dotenv
+coqui-tts
